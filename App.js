@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Button } from 'react-native';
 import { NavigationContainer, useNavigation, useRoute } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -8,6 +8,8 @@ import * as MediaLibrary from 'expo-media-library';
 import { Video, ResizeMode } from 'expo-av';
 import { Audio } from 'expo-av';
 import { useState, useEffect } from 'react';
+import { File, Directory, Paths } from 'expo-file-system';
+import { fetch } from 'expo/fetch';
 
 function Page1A() {
   const navigation = useNavigation();
@@ -52,9 +54,28 @@ function Page2B() {
 
 // Pestaña de Descargas (vacía)
 function DownloadsTab() {
+  const [text, setText] = useState('');
+
+  const handleChange = (text) => {
+    setText({text});
+  }
+
+  async function download(){
+    const response = await fetch(text);
+    const src = new File(Paths.cache, 'video.mp4');
+    src.write(await response.bytes());
+  }
+
   return (
     <View style={styles.container}>
       <Text>Pestaña de Descargas</Text>
+      <TextInput
+                    underlineColorAndroid="transparent"
+                    style={styles.input}
+                    onChangeText={handleChange}
+                    value={text}
+                  />
+      <Button title="donwloadButton" onPress={download}></Button>
       <StatusBar style="auto" />
     </View>
   );
@@ -455,4 +476,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#007AFF',
   },
+  input: {
+    height: 40,
+    margin: 12,
+    borderWidth: 1,
+    padding: 10,
+  }
 });
