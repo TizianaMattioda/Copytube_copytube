@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "817140393359",
+    "project_id": "copytube-2e0f4",
+    "storage_bucket": "copytube-2e0f4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:817140393359:android:0888400cb0e48a4993d7fa",
+        "android_client_info": {
+          "package_name": "com.copytube.copytube"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMDMAJrBK2BCFiI8nML71BMv2s7P64hd0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
