@@ -75,26 +75,10 @@ function DownloadsTab() {
     const downloadUrl = text && text.text ? text.text : 'https://peertube.tv/download/videos/90eee9f5-994d-471b-9374-4c3beb5a54cb-1080.mp4';
     
     try {
-      // Verificar permisos
-      if (!hasPermission) {
-        Alert.alert('Permisos necesarios', 'Se necesitan permisos para guardar archivos en Downloads');
-        await requestPermissions();
-        return;
-      }
-      
       // Validar URL
       if (!downloadUrl || downloadUrl.trim() === '') {
         Alert.alert('Error', 'Por favor ingresa una URL válida');
         return;
-      }
-      
-      // Crear directorio temporal para la descarga
-      const tempDir = FileSystem.cacheDirectory + 'temp_downloads/';
-      
-      // Verificar si el directorio temporal existe, si no, crearlo
-      const dirInfo = await FileSystem.getInfoAsync(tempDir);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
       }
       
       // Generar un nombre de archivo único basado en timestamp
@@ -102,55 +86,167 @@ function DownloadsTab() {
       const urlParts = downloadUrl.split('.');
       const extension = urlParts[urlParts.length - 1].split('?')[0]; // Obtener extensión sin parámetros
       const fileName = `download_${timestamp}.${extension}`;
-      const tempFilePath = tempDir + fileName;
       
       console.log('Descargando desde:', downloadUrl);
-      console.log('Descargando temporalmente a:', tempFilePath);
+      console.log('Nombre del archivo:', fileName);
       
-      // Descargar el archivo a ubicación temporal
-      const downloadResult = await FileSystem.downloadAsync(downloadUrl, tempFilePath);
-      
-      console.log('Descarga completada:', downloadResult.status === 200);
-      console.log('Archivo temporal en:', downloadResult.uri);
-      
-      // Verificar que la descarga fue exitosa
-      if (downloadResult.status === 200) {
-        // Guardar en la galería/Downloads usando MediaLibrary
-        const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+      // Usar DocumentPicker para permitir al usuario elegir dónde guardar
+      try {
+        // Primero descargamos a una ubicación temporal
+        const tempDir = FileSystem.cacheDirectory + 'temp_downloads/';
         
-        // Crear un álbum para nuestras descargas
-        const albumName = 'Copytube Downloads';
-        let album = await MediaLibrary.getAlbumAsync(albumName);
-        
-        if (!album) {
-          album = await MediaLibrary.createAlbumAsync(albumName, asset, false);
-        } else {
-          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        // Verificar si el directorio temporal existe, si no, crearlo
+        const dirInfo = await FileSystem.getInfoAsync(tempDir);
+        if (!dirInfo.exists) {
+          await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
         }
         
-        console.log('Archivo guardado en galería:', asset.id);
+        const tempFilePath = tempDir + fileName;
         
-        // Obtener información del archivo
-        const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
-        const sizeInMB = Math.round(fileInfo.size / 1024 / 1024 * 100) / 100;
+        console.log('Descargando temporalmente a:', tempFilePath);
         
-        Alert.alert(
-          'Éxito', 
-          `Archivo descargado exitosamente:\n${fileName}\nTamaño: ${sizeInMB} MB\n\nEl archivo se guardó en:\n📱 Galería → ${albumName}`
-        );
+        // Descargar el archivo a ubicación temporal
+        const downloadResult = await FileSystem.downloadAsync(downloadUrl, tempFilePath);
         
-        // Limpiar archivo temporal
-        await FileSystem.deleteAsync(tempFilePath, { idempotent: true });
+        console.log('Descarga completada:', downloadResult.status === 200);
         
-      } else {
-        Alert.alert('Error', 'No se pudo descargar el archivo');
+        // Verificar que la descarga fue exitosa
+        if (downloadResult.status === 200) {
+          // Obtener información del archivo
+          const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+          const sizeInMB = Math.round(fileInfo.size / 1024 / 1024 * 100) / 100;
+          
+          // Guardar directamente en Downloads/Copytube
+          try {
+            await saveToDownloads(downloadResult.uri, fileName, sizeInMB);
+            await FileSystem.deleteAsync(tempFilePath, { idempotent: true });
+          } catch (error) {
+            Alert.alert('Error', 'No se pudo guardar en Downloads');
+            await FileSystem.deleteAsync(tempFilePath, { idempotent: true });
+          }
+          
+        } else {
+          Alert.alert('Error', 'No se pudo descargar el archivo');
+        }
+        
+      } catch (error) {
+        console.error('Error en la descarga:', error);
+        Alert.alert('Error', `No se pudo descargar el archivo: ${error.message}`);
       }
       
     } catch (error) {
-      console.error('Error en la descarga:', error);
-      Alert.alert('Error', `No se pudo descargar el archivo: ${error.message}`);
+      console.error('Error general:', error);
+      Alert.alert('Error', `Error inesperado: ${error.message}`);
     }
   }
+  
+  const getMimeFromExtension = (ext) => {
+    const lower = (ext || '').toLowerCase();
+    if (lower === 'mp4') return 'video/mp4';
+    if (lower === 'webm') return 'video/webm';
+    if (lower === 'mkv') return 'video/x-matroska';
+    if (lower === 'mp3') return 'audio/mpeg';
+    if (lower === 'm4a') return 'audio/mp4';
+    if (lower === 'wav') return 'audio/wav';
+    return 'application/octet-stream';
+  };
+
+  // Función para obtener archivos de la carpeta de descargas
+  const getDownloadedFiles = async (mediaType = 'all') => {
+    const PERSISTED_URI_FILE = FileSystem.documentDirectory + 'copytube_downloads_dir.txt';
+    
+    try {
+      // Verificar si hay ubicación persistida
+      const persistedInfo = await FileSystem.getInfoAsync(PERSISTED_URI_FILE);
+      if (!persistedInfo.exists) {
+        return []; // No hay carpeta de descargas configurada
+      }
+      
+      const targetDirUri = await FileSystem.readAsStringAsync(PERSISTED_URI_FILE);
+      
+      // Listar archivos en la carpeta
+      const files = await FileSystem.StorageAccessFramework.readDirectoryAsync(targetDirUri);
+      
+      // Filtrar por tipo de media
+      const filteredFiles = files.filter(file => {
+        const ext = file.split('.').pop()?.toLowerCase();
+        
+        if (mediaType === 'video') {
+          return ['mp4', 'webm', 'mkv', 'avi', 'mov'].includes(ext);
+        } else if (mediaType === 'audio') {
+          return ['mp3', 'm4a', 'wav', 'aac', 'ogg'].includes(ext);
+        }
+        return true; // 'all'
+      });
+      
+      // Convertir a formato compatible con MediaLibrary
+      return filteredFiles.map(file => ({
+        id: file,
+        filename: file,
+        uri: targetDirUri + '/' + file,
+        mediaType: mediaType === 'video' ? 'video' : 'audio'
+      }));
+      
+    } catch (error) {
+      console.error('Error obteniendo archivos descargados:', error);
+      return [];
+    }
+  };
+
+  const saveToDownloads = async (fileUri, fileName, sizeInMB) => {
+    const PERSISTED_URI_FILE = FileSystem.documentDirectory + 'copytube_downloads_dir.txt';
+    
+    try {
+      let targetDirUri = null;
+      
+      // Intentar leer la ubicación persistida
+      const persistedInfo = await FileSystem.getInfoAsync(PERSISTED_URI_FILE);
+      if (persistedInfo.exists) {
+        try {
+          targetDirUri = await FileSystem.readAsStringAsync(PERSISTED_URI_FILE);
+        } catch (error) {
+          console.log('Error leyendo ubicación persistida:', error);
+        }
+      }
+      
+      // Si no hay ubicación persistida o es inválida, pedir al usuario seleccionar
+      if (!targetDirUri) {
+        const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        
+        if (!permission.granted) {
+          throw new Error('Permiso de carpeta denegado');
+        }
+        
+        targetDirUri = permission.directoryUri;
+        
+        // Guardar la ubicación para futuros usos
+        await FileSystem.writeAsStringAsync(PERSISTED_URI_FILE, targetDirUri);
+      }
+
+      // Elegir mime por extensión
+      const ext = (fileName.split('.').pop() || '').split('?')[0];
+      const mimeType = getMimeFromExtension(ext);
+
+      // Crear el archivo en la carpeta seleccionada
+      const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+        targetDirUri,
+        fileName,
+        mimeType
+      );
+
+      // Para archivos grandes, usar copyAsync en lugar de leer todo en memoria
+      await FileSystem.copyAsync({
+        from: fileUri,
+        to: destUri
+      });
+
+      Alert.alert('Éxito', `Archivo guardado exitosamente:\n\n${fileName} (${sizeInMB} MB)`);
+      
+    } catch (error) {
+      console.error('Error guardando archivo:', error);
+      throw error;
+    }
+  };
 
   if (!hasPermission) {
     return (
@@ -161,7 +257,7 @@ function DownloadsTab() {
           <Ionicons name="shield-checkmark" size={20} color="white" style={styles.buttonIcon} />
           <Text style={styles.buttonText}>Solicitar Permisos</Text>
         </TouchableOpacity>
-        <Text style={styles.note}>Los archivos se guardarán en la Galería del dispositivo</Text>
+        <Text style={styles.note}>La primera vez elegirás dónde guardar. Después se recordará la ubicación.</Text>
         <StatusBar style="auto" />
       </View>
     );
@@ -184,7 +280,7 @@ function DownloadsTab() {
         <Text style={styles.buttonText}>Descargar</Text>
       </TouchableOpacity>
       <Text style={styles.note}>Si no ingresas una URL, se descargará un video de ejemplo.</Text>
-      <Text style={styles.note}>Los archivos se guardan en: 📱 Galería → Copytube Downloads</Text>
+      <Text style={styles.note}>La primera vez elegirás dónde guardar. Después se recordará la ubicación.</Text>
       <StatusBar style="auto" />
     </View>
   );
@@ -212,12 +308,20 @@ function VideoTab() {
 
   const loadVideos = async () => {
     try {
+      // Cargar videos de la galería
       const media = await MediaLibrary.getAssetsAsync({
         mediaType: MediaLibrary.MediaType.video,
         sortBy: MediaLibrary.SortBy.creationTime,
         first: 100,
       });
-      setVideos(media.assets);
+      
+      // Obtener videos descargados
+      const downloadedVideos = await getDownloadedFiles('video');
+      
+      // Combinar videos de galería y descargados
+      const allVideos = [...media.assets, ...downloadedVideos];
+      
+      setVideos(allVideos);
     } catch (error) {
       Alert.alert('Error', 'No se pudieron cargar los videos');
     }
@@ -326,12 +430,20 @@ function AudioTab() {
 
   const loadAudio = async () => {
     try {
+      // Cargar audio de la galería
       const media = await MediaLibrary.getAssetsAsync({
         mediaType: MediaLibrary.MediaType.audio,
         sortBy: MediaLibrary.SortBy.creationTime,
         first: 100,
       });
-      setSounds(media.assets);
+      
+      // Obtener audios descargados
+      const downloadedAudio = await getDownloadedFiles('audio');
+      
+      // Combinar audio de galería y descargados
+      const allAudio = [...media.assets, ...downloadedAudio];
+      
+      setSounds(allAudio);
     } catch (error) {
       Alert.alert('Error', 'No se pudieron cargar los archivos de audio');
     }
