@@ -61,9 +61,16 @@ function DownloadsTab() {
   }
 
   async function download(){
-    const response = await fetch(text);
-    const src = new File(Paths.cache, 'video.mp4');
-    src.write(await response.bytes());
+    const url = 'https://peertube.tv/download/videos/90eee9f5-994d-471b-9374-4c3beb5a54cb-1080.mp4';
+    const destination = new Directory(Paths.cache, 'videos');
+    try {
+      destination.create();
+      const output = await File.downloadFileAsync(url, destination);
+      console.log(output.exists); // true
+      console.log(output.uri); // path to the downloaded file, e.g., '${cacheDirectory}/pdfs/sample.pdf'
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   return (
