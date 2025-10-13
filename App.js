@@ -8,7 +8,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { Video, ResizeMode } from 'expo-av';
 import { Audio } from 'expo-av';
 import { useState, useEffect } from 'react';
-import { File, Directory, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { fetch } from 'expo/fetch';
 
 function Page1A() {
@@ -55,34 +55,136 @@ function Page2B() {
 // Pestaña de Descargas (vacía)
 function DownloadsTab() {
   const [text, setText] = useState('');
+  const [hasPermission, setHasPermission] = useState(false);
+
+  useEffect(() => {
+    requestPermissions();
+  }, []);
+
+  const requestPermissions = async () => {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    setHasPermission(status === 'granted');
+  };
 
   const handleChange = (text) => {
     setText({text});
   }
 
   async function download(){
-    const url = 'https://peertube.tv/download/videos/90eee9f5-994d-471b-9374-4c3beb5a54cb-1080.mp4';
-    const destination = new Directory(Paths.cache, 'videos');
+    // Usar la URL del input o la URL por defecto
+    const downloadUrl = text && text.text ? text.text : 'https://peertube.tv/download/videos/90eee9f5-994d-471b-9374-4c3beb5a54cb-1080.mp4';
+    
     try {
-      destination.create();
-      const output = await File.downloadFileAsync(url, destination);
-      console.log(output.exists); // true
-      console.log(output.uri); // path to the downloaded file, e.g., '${cacheDirectory}/pdfs/sample.pdf'
+      // Verificar permisos
+      if (!hasPermission) {
+        Alert.alert('Permisos necesarios', 'Se necesitan permisos para guardar archivos en Downloads');
+        await requestPermissions();
+        return;
+      }
+      
+      // Validar URL
+      if (!downloadUrl || downloadUrl.trim() === '') {
+        Alert.alert('Error', 'Por favor ingresa una URL válida');
+        return;
+      }
+      
+      // Crear directorio temporal para la descarga
+      const tempDir = FileSystem.cacheDirectory + 'temp_downloads/';
+      
+      // Verificar si el directorio temporal existe, si no, crearlo
+      const dirInfo = await FileSystem.getInfoAsync(tempDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
+      }
+      
+      // Generar un nombre de archivo único basado en timestamp
+      const timestamp = new Date().getTime();
+      const urlParts = downloadUrl.split('.');
+      const extension = urlParts[urlParts.length - 1].split('?')[0]; // Obtener extensión sin parámetros
+      const fileName = `download_${timestamp}.${extension}`;
+      const tempFilePath = tempDir + fileName;
+      
+      console.log('Descargando desde:', downloadUrl);
+      console.log('Descargando temporalmente a:', tempFilePath);
+      
+      // Descargar el archivo a ubicación temporal
+      const downloadResult = await FileSystem.downloadAsync(downloadUrl, tempFilePath);
+      
+      console.log('Descarga completada:', downloadResult.status === 200);
+      console.log('Archivo temporal en:', downloadResult.uri);
+      
+      // Verificar que la descarga fue exitosa
+      if (downloadResult.status === 200) {
+        // Guardar en la galería/Downloads usando MediaLibrary
+        const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+        
+        // Crear un álbum para nuestras descargas
+        const albumName = 'Copytube Downloads';
+        let album = await MediaLibrary.getAlbumAsync(albumName);
+        
+        if (!album) {
+          album = await MediaLibrary.createAlbumAsync(albumName, asset, false);
+        } else {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        }
+        
+        console.log('Archivo guardado en galería:', asset.id);
+        
+        // Obtener información del archivo
+        const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+        const sizeInMB = Math.round(fileInfo.size / 1024 / 1024 * 100) / 100;
+        
+        Alert.alert(
+          'Éxito', 
+          `Archivo descargado exitosamente:\n${fileName}\nTamaño: ${sizeInMB} MB\n\nEl archivo se guardó en:\n📱 Galería → ${albumName}`
+        );
+        
+        // Limpiar archivo temporal
+        await FileSystem.deleteAsync(tempFilePath, { idempotent: true });
+        
+      } else {
+        Alert.alert('Error', 'No se pudo descargar el archivo');
+      }
+      
     } catch (error) {
-      console.error(error);
+      console.error('Error en la descarga:', error);
+      Alert.alert('Error', `No se pudo descargar el archivo: ${error.message}`);
     }
+  }
+
+  if (!hasPermission) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Descargar Videos</Text>
+        <Text style={styles.subtitle}>Se necesitan permisos para guardar archivos</Text>
+        <TouchableOpacity style={styles.permissionButton} onPress={requestPermissions}>
+          <Ionicons name="shield-checkmark" size={20} color="white" style={styles.buttonIcon} />
+          <Text style={styles.buttonText}>Solicitar Permisos</Text>
+        </TouchableOpacity>
+        <Text style={styles.note}>Los archivos se guardarán en la Galería del dispositivo</Text>
+        <StatusBar style="auto" />
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
-      <Text>Pestaña de Descargas</Text>
+      <Text style={styles.title}>Descargar Videos</Text>
+      <Text style={styles.subtitle}>Ingresa la URL del video que quieres descargar:</Text>
       <TextInput
-                    underlineColorAndroid="transparent"
-                    style={styles.input}
-                    onChangeText={handleChange}
-                    value={text}
-                  />
-      <Button title="donwloadButton" onPress={download}></Button>
+        underlineColorAndroid="transparent"
+        style={styles.input}
+        onChangeText={handleChange}
+        value={text}
+        placeholder="https://ejemplo.com/video.mp4"
+        multiline={false}
+      />
+      <TouchableOpacity style={styles.downloadButton} onPress={download}>
+        <Ionicons name="download" size={20} color="white" style={styles.buttonIcon} />
+        <Text style={styles.buttonText}>Descargar</Text>
+      </TouchableOpacity>
+      <Text style={styles.note}>Si no ingresas una URL, se descargará un video de ejemplo.</Text>
+      <Text style={styles.note}>Los archivos se guardan en: 📱 Galería → Copytube Downloads</Text>
       <StatusBar style="auto" />
     </View>
   );
@@ -488,5 +590,47 @@ const styles = StyleSheet.create({
     margin: 12,
     borderWidth: 1,
     padding: 10,
+    width: '90%',
+    borderRadius: 5,
+    borderColor: '#ddd',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  downloadButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 15,
+  },
+  permissionButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 15,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  note: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 10,
+    fontStyle: 'italic',
   }
 });
