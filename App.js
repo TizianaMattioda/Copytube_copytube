@@ -4,7 +4,6 @@ import { NavigationContainer, useNavigation, useRoute } from '@react-navigation/
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import * as MediaLibrary from 'expo-media-library';
 import { Video, ResizeMode } from 'expo-av';
 import { Audio } from 'expo-av';
 import { useState, useEffect } from 'react';
@@ -55,16 +54,6 @@ function Page2B() {
 // Pestaña de Descargas (vacía)
 function DownloadsTab() {
   const [text, setText] = useState('');
-  const [hasPermission, setHasPermission] = useState(false);
-
-  useEffect(() => {
-    requestPermissions();
-  }, []);
-
-  const requestPermissions = async () => {
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    setHasPermission(status === 'granted');
-  };
 
   const handleChange = (text) => {
     setText({text});
@@ -72,15 +61,9 @@ function DownloadsTab() {
 
   async function download(){
     // Usar la URL del input o la URL por defecto
-    const downloadUrl = text && text.text ? text.text : 'https://peertube.tv/download/videos/90eee9f5-994d-471b-9374-4c3beb5a54cb-1080.mp4';
+    const downloadUrl = text && text.text ? text.text : 'https://peertube.tv/download/videos/9b592401-e6d7-4b3d-b60c-03f4fd5d0b34-144.mp4';
     
     try {
-      // Verificar permisos
-      if (!hasPermission) {
-        Alert.alert('Permisos necesarios', 'Se necesitan permisos para guardar archivos en Downloads');
-        await requestPermissions();
-        return;
-      }
       
       // Validar URL
       if (!downloadUrl || downloadUrl.trim() === '') {
@@ -104,8 +87,17 @@ function DownloadsTab() {
       const fileName = `download_${timestamp}.${extension}`;
       const tempFilePath = tempDir + fileName;
       
+      // Determinar si es audio o video basado en la extensión
+      const audioExtensions = ['mp3', 'm4a', 'wav', 'aac', 'flac', 'ogg', 'wma', 'opus'];
+      const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv', 'm4v', '3gp'];
+      const extensionLower = extension.toLowerCase();
+      
+      const isAudio = audioExtensions.includes(extensionLower);
+      const isVideo = videoExtensions.includes(extensionLower);
+      
       console.log('Descargando desde:', downloadUrl);
       console.log('Descargando temporalmente a:', tempFilePath);
+      console.log('Tipo de archivo:', isAudio ? 'Audio' : isVideo ? 'Video' : 'Desconocido');
       
       // Descargar el archivo a ubicación temporal
       const downloadResult = await FileSystem.downloadAsync(downloadUrl, tempFilePath);
@@ -115,28 +107,45 @@ function DownloadsTab() {
       
       // Verificar que la descarga fue exitosa
       if (downloadResult.status === 200) {
-        // Guardar en la galería/Downloads usando MediaLibrary
-        const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+        let storageLocation;
+        let finalDir;
         
-        // Crear un álbum para nuestras descargas
-        const albumName = 'Copytube Downloads';
-        let album = await MediaLibrary.getAlbumAsync(albumName);
-        
-        if (!album) {
-          album = await MediaLibrary.createAlbumAsync(albumName, asset, false);
+        // Definir carpeta según tipo de archivo
+        if (isAudio) {
+          finalDir = FileSystem.documentDirectory + 'CopyTube/Audio/';
+          storageLocation = '🎵 CopyTube → Audio';
+        } else if (isVideo) {
+          finalDir = FileSystem.documentDirectory + 'CopyTube/Video/';
+          storageLocation = '🎬 CopyTube → Video';
         } else {
-          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+          finalDir = FileSystem.documentDirectory + 'CopyTube/Files/';
+          storageLocation = '📱 CopyTube → Files';
         }
         
-        console.log('Archivo guardado en galería:', asset.id);
+        // Crear directorio si no existe
+        const dirInfo = await FileSystem.getInfoAsync(finalDir);
+        if (!dirInfo.exists) {
+          await FileSystem.makeDirectoryAsync(finalDir, { intermediates: true });
+        }
         
-        // Obtener información del archivo
-        const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+        // Mover archivo desde temp a carpeta final
+        const finalPath = finalDir + fileName;
+        await FileSystem.moveAsync({
+          from: downloadResult.uri,
+          to: finalPath
+        });
+        
+        console.log('Archivo guardado en:', finalPath);
+        
+        // Obtener información del archivo desde su ubicación final
+        const fileInfo = await FileSystem.getInfoAsync(finalPath);
         const sizeInMB = Math.round(fileInfo.size / 1024 / 1024 * 100) / 100;
+        
+        const fileType = isAudio ? 'Audio' : isVideo ? 'Video' : 'Archivo';
         
         Alert.alert(
           'Éxito', 
-          `Archivo descargado exitosamente:\n${fileName}\nTamaño: ${sizeInMB} MB\n\nEl archivo se guardó en:\n📱 Galería → ${albumName}`
+          `${fileType} descargado exitosamente:\n${fileName}\nTamaño: ${sizeInMB} MB\n\nGuardado en:\n${storageLocation}`
         );
         
         // Limpiar archivo temporal
@@ -150,21 +159,6 @@ function DownloadsTab() {
       console.error('Error en la descarga:', error);
       Alert.alert('Error', `No se pudo descargar el archivo: ${error.message}`);
     }
-  }
-
-  if (!hasPermission) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Descargar Videos</Text>
-        <Text style={styles.subtitle}>Se necesitan permisos para guardar archivos</Text>
-        <TouchableOpacity style={styles.permissionButton} onPress={requestPermissions}>
-          <Ionicons name="shield-checkmark" size={20} color="white" style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Solicitar Permisos</Text>
-        </TouchableOpacity>
-        <Text style={styles.note}>Los archivos se guardarán en la Galería del dispositivo</Text>
-        <StatusBar style="auto" />
-      </View>
-    );
   }
 
   return (
@@ -184,7 +178,9 @@ function DownloadsTab() {
         <Text style={styles.buttonText}>Descargar</Text>
       </TouchableOpacity>
       <Text style={styles.note}>Si no ingresas una URL, se descargará un video de ejemplo.</Text>
-      <Text style={styles.note}>Los archivos se guardan en: 📱 Galería → Copytube Downloads</Text>
+      <Text style={styles.note}>🎵 Audio: CopyTube → Audio</Text>
+      <Text style={styles.note}>🎬 Video: CopyTube → Video</Text>
+      <Text style={styles.note}>Los archivos se guardan en el almacenamiento interno de la app</Text>
       <StatusBar style="auto" />
     </View>
   );
@@ -196,30 +192,42 @@ function VideoTab() {
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [videoRef, setVideoRef] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [hasPermission, setHasPermission] = useState(false);
 
   useEffect(() => {
-    requestPermissions();
+    loadVideos();
   }, []);
-
-  const requestPermissions = async () => {
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    setHasPermission(status === 'granted');
-    if (status === 'granted') {
-      loadVideos();
-    }
-  };
 
   const loadVideos = async () => {
     try {
-      const media = await MediaLibrary.getAssetsAsync({
-        mediaType: MediaLibrary.MediaType.video,
-        sortBy: MediaLibrary.SortBy.creationTime,
-        first: 100,
-      });
-      setVideos(media.assets);
+      const videoDir = FileSystem.documentDirectory + 'CopyTube/Video/';
+      
+      // Verificar si la carpeta existe
+      const dirInfo = await FileSystem.getInfoAsync(videoDir);
+      
+      if (dirInfo.exists) {
+        // Leer archivos de la carpeta
+        const files = await FileSystem.readDirectoryAsync(videoDir);
+        
+        // Filtrar solo archivos de video y crear objetos con la estructura necesaria
+        const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv', 'm4v', '3gp'];
+        const videoFiles = files
+          .filter(file => {
+            const ext = file.split('.').pop().toLowerCase();
+            return videoExtensions.includes(ext);
+          })
+          .map(file => ({
+            filename: file,
+            uri: videoDir + file,
+            id: file
+          }));
+        
+        setVideos(videoFiles);
+      } else {
+        setVideos([]);
+      }
     } catch (error) {
-      Alert.alert('Error', 'No se pudieron cargar los videos');
+      console.error('Error cargando videos:', error);
+      Alert.alert('Error', 'No se pudieron cargar los videos: ' + error.message);
     }
   };
 
@@ -243,17 +251,6 @@ function VideoTab() {
       await videoRef.presentFullscreenPlayer();
     }
   };
-
-  if (!hasPermission) {
-    return (
-      <View style={styles.container}>
-        <Text>Se necesita permiso para acceder a los videos</Text>
-        <TouchableOpacity onPress={requestPermissions} style={styles.button}>
-          <Text>Solicitar Permisos</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -310,30 +307,42 @@ function AudioTab() {
   const [selectedSound, setSelectedSound] = useState(null);
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [hasPermission, setHasPermission] = useState(false);
 
   useEffect(() => {
-    requestPermissions();
+    loadAudio();
   }, []);
-
-  const requestPermissions = async () => {
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    setHasPermission(status === 'granted');
-    if (status === 'granted') {
-      loadAudio();
-    }
-  };
 
   const loadAudio = async () => {
     try {
-      const media = await MediaLibrary.getAssetsAsync({
-        mediaType: MediaLibrary.MediaType.audio,
-        sortBy: MediaLibrary.SortBy.creationTime,
-        first: 100,
-      });
-      setSounds(media.assets);
+      const audioDir = FileSystem.documentDirectory + 'CopyTube/Audio/';
+      
+      // Verificar si la carpeta existe
+      const dirInfo = await FileSystem.getInfoAsync(audioDir);
+      
+      if (dirInfo.exists) {
+        // Leer archivos de la carpeta
+        const files = await FileSystem.readDirectoryAsync(audioDir);
+        
+        // Filtrar solo archivos de audio y crear objetos con la estructura necesaria
+        const audioExtensions = ['mp3', 'm4a', 'wav', 'aac', 'flac', 'ogg', 'wma', 'opus'];
+        const audioFiles = files
+          .filter(file => {
+            const ext = file.split('.').pop().toLowerCase();
+            return audioExtensions.includes(ext);
+          })
+          .map(file => ({
+            filename: file,
+            uri: audioDir + file,
+            id: file
+          }));
+        
+        setSounds(audioFiles);
+      } else {
+        setSounds([]);
+      }
     } catch (error) {
-      Alert.alert('Error', 'No se pudieron cargar los archivos de audio');
+      console.error('Error cargando audios:', error);
+      Alert.alert('Error', 'No se pudieron cargar los archivos de audio: ' + error.message);
     }
   };
 
@@ -373,17 +382,6 @@ function AudioTab() {
       setIsPlaying(true);
     }
   };
-
-  if (!hasPermission) {
-    return (
-      <View style={styles.container}>
-        <Text>Se necesita permiso para acceder a los archivos de audio</Text>
-        <TouchableOpacity onPress={requestPermissions} style={styles.button}>
-          <Text>Solicitar Permisos</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
