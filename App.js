@@ -1,57 +1,14 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Button } from 'react-native';
-import { NavigationContainer, useNavigation, useRoute } from '@react-navigation/native';
+import { NavigationContainer, useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { Audio } from 'expo-av';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
-import { fetch } from 'expo/fetch';
 
-function Page1A() {
-  const navigation = useNavigation();
-  const route = useRoute();
-  const { text } = route.params || { text: 'Open up App.js to start working on your app!' };
-
-  return (
-    <View style={styles.container}>
-      <Text>{text}</Text>
-      <StatusBar style="auto" />
-      <TouchableOpacity onPress={() => navigation.navigate('name2')} style={styles.button}>Change page</TouchableOpacity>
-    </View>
-  );
-}
-
-function Page2A() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
-
-function Page1B() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
-
-function Page2B() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
-
-// Pestaña de Descargas (vacía)
 function DownloadsTab() {
   const [text, setText] = useState('');
 
@@ -163,7 +120,7 @@ function DownloadsTab() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Descargar Videos</Text>
+      <Text style={styles.title}>Descargar videos y música</Text>
       <Text style={styles.subtitle}>Ingresa la URL del video que quieres descargar:</Text>
       <TextInput
         underlineColorAndroid="transparent"
@@ -171,6 +128,7 @@ function DownloadsTab() {
         onChangeText={handleChange}
         value={text}
         placeholder="https://ejemplo.com/video.mp4"
+        placeholderTextColor="#BBB"
         multiline={false}
       />
       <TouchableOpacity style={styles.downloadButton} onPress={download}>
@@ -178,9 +136,7 @@ function DownloadsTab() {
         <Text style={styles.buttonText}>Descargar</Text>
       </TouchableOpacity>
       <Text style={styles.note}>Si no ingresas una URL, se descargará un video de ejemplo.</Text>
-      <Text style={styles.note}>🎵 Audio: CopyTube → Audio</Text>
-      <Text style={styles.note}>🎬 Video: CopyTube → Video</Text>
-      <Text style={styles.note}>Los archivos se guardan en el almacenamiento interno de la app</Text>
+      <Text style={styles.note}>Los archivos se guardan en el almacenamiento interno de la app.</Text>
       <StatusBar style="auto" />
     </View>
   );
@@ -193,9 +149,11 @@ function VideoTab() {
   const [videoRef, setVideoRef] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  useEffect(() => {
-    loadVideos();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadVideos();
+    }, [])
+  );
 
   const loadVideos = async () => {
     try {
@@ -254,7 +212,7 @@ function VideoTab() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Reproductor de Video</Text>
+      <Text style={styles.title}>Reproductor de video</Text>
       
       {selectedVideo && (
         <View style={styles.videoContainer}>
@@ -308,9 +266,11 @@ function AudioTab() {
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  useEffect(() => {
-    loadAudio();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadAudio();
+    }, [])
+  );
 
   const loadAudio = async () => {
     try {
@@ -385,7 +345,7 @@ function AudioTab() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Reproductor de Audio</Text>
+      <Text style={styles.title}>Reproductor de audio</Text>
       
       {selectedSound && (
         <View style={styles.audioContainer}>
@@ -425,24 +385,6 @@ function AudioTab() {
 
 const StackPage1 = createNativeStackNavigator()
 const StackPage2 = createNativeStackNavigator()
-
-function StackPage1Navigator() {
-  return (
-    <StackPage1.Navigator>
-      <StackPage1.Screen name="name1" component={Page1A} />
-      <StackPage1.Screen name="name2" component={Page1B} />
-    </StackPage1.Navigator>
-  )
-}
-
-function StackPage2Navigator() {
-  return (
-    <StackPage2.Navigator>
-      <StackPage2.Screen name="name3" component={Page2A} />
-      <StackPage2.Screen name="name4" component={Page2B} />
-    </StackPage2.Navigator>
-  )
-}
 
 const Tab = createBottomTabNavigator();
 function TabNavigator() {
@@ -569,7 +511,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
     backgroundColor: '#f9f9f9',
     marginBottom: 5,
-    borderRadius: 5,
+    borderRadius: 20,
   },
   mediaText: {
     flex: 1,
@@ -591,6 +533,7 @@ const styles = StyleSheet.create({
     width: '90%',
     borderRadius: 5,
     borderColor: '#ddd',
+    color: 'black',
   },
   subtitle: {
     fontSize: 16,
