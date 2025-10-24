@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Button } from 'react-native';
+import CustomSlider from './CustomSlider';
 import { NavigationContainer, useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -148,6 +149,10 @@ function VideoTab() {
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [videoRef, setVideoRef] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1.0);
+  const [isSeeking, setIsSeeking] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -191,6 +196,8 @@ function VideoTab() {
 
   const playVideo = async (video) => {
     setSelectedVideo(video);
+    setPosition(0);
+    setDuration(0);
     if (videoRef) {
       await videoRef.playAsync();
       setIsPlaying(true);
@@ -210,6 +217,52 @@ function VideoTab() {
     }
   };
 
+  const stopVideo = async () => {
+    if (videoRef) {
+      await videoRef.stopAsync();
+      await videoRef.setPositionAsync(0);
+      setIsPlaying(false);
+      setPosition(0);
+    }
+  };
+
+  const seekForward = async () => {
+    if (videoRef && duration > 0) {
+      const newPosition = Math.min(position + 10000, duration);
+      await videoRef.setPositionAsync(newPosition);
+      setPosition(newPosition);
+    }
+  };
+
+  const seekBackward = async () => {
+    if (videoRef) {
+      const newPosition = Math.max(position - 10000, 0);
+      await videoRef.setPositionAsync(newPosition);
+      setPosition(newPosition);
+    }
+  };
+
+  const onSliderValueChange = async (value) => {
+    if (videoRef && !isSeeking) {
+      setIsSeeking(true);
+    }
+    setPosition(value);
+  };
+
+  const onSliderSlidingComplete = async (value) => {
+    if (videoRef) {
+      await videoRef.setPositionAsync(value);
+      setIsSeeking(false);
+    }
+  };
+
+  const formatTime = (millis) => {
+    const totalSeconds = Math.floor(millis / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Reproductor de video</Text>
@@ -222,17 +275,64 @@ function VideoTab() {
             source={{ uri: selectedVideo.uri }}
             useNativeControls={false}
             resizeMode={ResizeMode.CONTAIN}
+            volume={volume}
             onPlaybackStatusUpdate={(status) => {
-              setIsPlaying(status.isPlaying);
+              if (status.isLoaded) {
+                setIsPlaying(status.isPlaying);
+                if (!isSeeking) {
+                  setPosition(status.positionMillis);
+                }
+                setDuration(status.durationMillis || 0);
+              }
             }}
           />
-          <View style={styles.videoControls}>
-            <TouchableOpacity onPress={isPlaying ? pauseVideo : () => playVideo(selectedVideo)} style={styles.controlButton}>
-              <Ionicons name={isPlaying ? "pause" : "play"} size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
-              <Ionicons name="expand" size={24} color="white" />
-            </TouchableOpacity>
+          <View style={styles.videoControlsContainer}>
+            <View style={styles.progressContainer}>
+              <Text style={styles.timeText}>{formatTime(position)}</Text>
+              <CustomSlider
+                style={styles.slider}
+                minimumValue={0}
+                maximumValue={duration}
+                value={position}
+                onValueChange={onSliderValueChange}
+                onSlidingComplete={onSliderSlidingComplete}
+                minimumTrackTintColor="#007AFF"
+                maximumTrackTintColor="#d3d3d3"
+                thumbTintColor="#007AFF"
+              />
+              <Text style={styles.timeText}>{formatTime(duration)}</Text>
+            </View>
+            <View style={styles.videoControls}>
+              <TouchableOpacity onPress={seekBackward} style={styles.controlButton}>
+                <Ionicons name="play-back" size={24} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={stopVideo} style={styles.controlButton}>
+                <Ionicons name="stop" size={24} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={isPlaying ? pauseVideo : () => playVideo(selectedVideo)} style={styles.controlButton}>
+                <Ionicons name={isPlaying ? "pause" : "play"} size={28} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={seekForward} style={styles.controlButton}>
+                <Ionicons name="play-forward" size={24} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
+                <Ionicons name="expand" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.volumeContainer}>
+              <Ionicons name="volume-low" size={20} color="white" />
+              <CustomSlider
+                style={styles.volumeSlider}
+                minimumValue={0}
+                maximumValue={1}
+                value={volume}
+                onValueChange={setVolume}
+                minimumTrackTintColor="#007AFF"
+                maximumTrackTintColor="#d3d3d3"
+                thumbTintColor="#007AFF"
+              />
+              <Ionicons name="volume-high" size={20} color="white" />
+            </View>
           </View>
         </View>
       )}
@@ -265,6 +365,10 @@ function AudioTab() {
   const [selectedSound, setSelectedSound] = useState(null);
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1.0);
+  const [isSeeking, setIsSeeking] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -314,15 +418,23 @@ function AudioTab() {
       
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audio.uri },
-        { shouldPlay: true }
+        { shouldPlay: true, volume: volume }
       );
       
       setSound(newSound);
       setSelectedSound(audio);
       setIsPlaying(true);
+      setPosition(0);
+      setDuration(0);
 
       newSound.setOnPlaybackStatusUpdate((status) => {
-        setIsPlaying(status.isPlaying);
+        if (status.isLoaded) {
+          setIsPlaying(status.isPlaying);
+          if (!isSeeking) {
+            setPosition(status.positionMillis);
+          }
+          setDuration(status.durationMillis || 0);
+        }
       });
     } catch (error) {
       Alert.alert('Error', 'No se pudo reproducir el audio');
@@ -343,6 +455,59 @@ function AudioTab() {
     }
   };
 
+  const stopSound = async () => {
+    if (sound) {
+      await sound.stopAsync();
+      await sound.setPositionAsync(0);
+      setIsPlaying(false);
+      setPosition(0);
+    }
+  };
+
+  const seekForward = async () => {
+    if (sound && duration > 0) {
+      const newPosition = Math.min(position + 10000, duration);
+      await sound.setPositionAsync(newPosition);
+      setPosition(newPosition);
+    }
+  };
+
+  const seekBackward = async () => {
+    if (sound) {
+      const newPosition = Math.max(position - 10000, 0);
+      await sound.setPositionAsync(newPosition);
+      setPosition(newPosition);
+    }
+  };
+
+  const onSliderValueChange = async (value) => {
+    if (sound && !isSeeking) {
+      setIsSeeking(true);
+    }
+    setPosition(value);
+  };
+
+  const onSliderSlidingComplete = async (value) => {
+    if (sound) {
+      await sound.setPositionAsync(value);
+      setIsSeeking(false);
+    }
+  };
+
+  const onVolumeChange = async (value) => {
+    setVolume(value);
+    if (sound) {
+      await sound.setVolumeAsync(value);
+    }
+  };
+
+  const formatTime = (millis) => {
+    const totalSeconds = Math.floor(millis / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Reproductor de audio</Text>
@@ -350,13 +515,51 @@ function AudioTab() {
       {selectedSound && (
         <View style={styles.audioContainer}>
           <Text style={styles.audioTitle}>{selectedSound.filename}</Text>
+          <View style={styles.progressContainer}>
+            <Text style={styles.timeText}>{formatTime(position)}</Text>
+            <CustomSlider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={duration}
+              value={position}
+              onValueChange={onSliderValueChange}
+              onSlidingComplete={onSliderSlidingComplete}
+              minimumTrackTintColor="#007AFF"
+              maximumTrackTintColor="#d3d3d3"
+              thumbTintColor="#007AFF"
+            />
+            <Text style={styles.timeText}>{formatTime(duration)}</Text>
+          </View>
           <View style={styles.audioControls}>
+            <TouchableOpacity onPress={seekBackward} style={styles.audioControlButton}>
+              <Ionicons name="play-back" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={stopSound} style={styles.audioControlButton}>
+              <Ionicons name="stop" size={24} color="white" />
+            </TouchableOpacity>
             <TouchableOpacity 
               onPress={isPlaying ? pauseSound : resumeSound} 
               style={styles.audioControlButton}
             >
-              <Ionicons name={isPlaying ? "pause" : "play"} size={24} color="white" />
+              <Ionicons name={isPlaying ? "pause" : "play"} size={28} color="white" />
             </TouchableOpacity>
+            <TouchableOpacity onPress={seekForward} style={styles.audioControlButton}>
+              <Ionicons name="play-forward" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.volumeContainer}>
+            <Ionicons name="volume-low" size={20} color="#007AFF" />
+            <CustomSlider
+              style={styles.volumeSlider}
+              minimumValue={0}
+              maximumValue={1}
+              value={volume}
+              onValueChange={onVolumeChange}
+              minimumTrackTintColor="#007AFF"
+              maximumTrackTintColor="#d3d3d3"
+              thumbTintColor="#007AFF"
+            />
+            <Ionicons name="volume-high" size={20} color="#007AFF" />
           </View>
         </View>
       )}
@@ -450,7 +653,6 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     width: '90%',
-    height: 200,
     marginBottom: 20,
     borderRadius: 10,
     overflow: 'hidden',
@@ -458,16 +660,45 @@ const styles = StyleSheet.create({
   },
   video: {
     width: '100%',
-    height: '100%',
+    height: 200,
+  },
+  videoControlsContainer: {
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    padding: 15,
   },
   videoControls: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    right: 10,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
+    alignItems: 'center',
+    gap: 15,
+    marginVertical: 10,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 10,
+  },
+  slider: {
+    flex: 1,
+    marginHorizontal: 10,
+  },
+  timeText: {
+    color: 'white',
+    fontSize: 12,
+    minWidth: 45,
+    textAlign: 'center',
+  },
+  volumeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingHorizontal: 20,
+  },
+  volumeSlider: {
+    flex: 1,
+    marginHorizontal: 10,
   },
   controlButton: {
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -491,12 +722,15 @@ const styles = StyleSheet.create({
   audioControls: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
+    gap: 15,
+    marginTop: 15,
   },
   audioControlButton: {
     backgroundColor: '#007AFF',
-    padding: 15,
+    padding: 12,
     borderRadius: 50,
-    marginHorizontal: 10,
+    marginHorizontal: 5,
   },
   mediaList: {
     width: '90%',
