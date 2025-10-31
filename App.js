@@ -4,7 +4,7 @@ import { NavigationContainer, useNavigation, useRoute, useFocusEffect } from '@r
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Audio } from 'expo-av';
 import React, { useState, useEffect } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -148,6 +148,7 @@ function VideoTab() {
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [videoRef, setVideoRef] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  
 
   useFocusEffect(
     React.useCallback(() => {
@@ -155,8 +156,11 @@ function VideoTab() {
     }, [])
   );
 
+  const videoPlayer = useVideoPlayer(selectedVideo? selectedVideo.uri : {}, player => {player.play()});
+
   const loadVideos = async () => {
     try {
+
       const videoDir = FileSystem.documentDirectory + 'CopyTube/Video/';
       
       // Verificar si la carpeta existe
@@ -189,52 +193,26 @@ function VideoTab() {
     }
   };
 
-  const playVideo = async (video) => {
-    setSelectedVideo(video);
-    if (videoRef) {
-      await videoRef.playAsync();
-      setIsPlaying(true);
-    }
-  };
-
-  const pauseVideo = async () => {
-    if (videoRef) {
-      await videoRef.pauseAsync();
-      setIsPlaying(false);
-    }
-  };
-
-  const toggleFullscreen = async () => {
-    if (videoRef) {
-      await videoRef.presentFullscreenPlayer();
-    }
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Reproductor de video</Text>
       
       {selectedVideo && (
-        <View style={styles.videoContainer}>
-          <Video
-            ref={setVideoRef}
-            style={styles.video}
-            source={{ uri: selectedVideo.uri }}
-            useNativeControls={false}
-            resizeMode={ResizeMode.CONTAIN}
-            onPlaybackStatusUpdate={(status) => {
-              setIsPlaying(status.isPlaying);
+        <View style={styles.contentContainer}>
+        <VideoView style={styles.video} player={videoPlayer} allowsFullscreen allowsPictureInPicture />
+        <View style={styles.controlsContainer}>
+          <Button
+            title={isPlaying ? 'Pause' : 'Play'}
+            onPress={() => {
+              if (isPlaying) {
+                player.pause();
+              } else {
+                player.play();
+              }
             }}
           />
-          <View style={styles.videoControls}>
-            <TouchableOpacity onPress={isPlaying ? pauseVideo : () => playVideo(selectedVideo)} style={styles.controlButton}>
-              <Ionicons name={isPlaying ? "pause" : "play"} size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
-              <Ionicons name="expand" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
         </View>
+      </View>
       )}
 
       <FlatList
@@ -246,7 +224,7 @@ function VideoTab() {
             onPress={() => setSelectedVideo(item)}
           >
             <Text style={styles.mediaText}>{item.filename}</Text>
-            <TouchableOpacity onPress={() => playVideo(item)} style={styles.playButton}>
+            <TouchableOpacity onPress={() => videoPlayer.play()} style={styles.playButton}>
               <Ionicons name="play" size={20} color="#007AFF" />
             </TouchableOpacity>
           </TouchableOpacity>
