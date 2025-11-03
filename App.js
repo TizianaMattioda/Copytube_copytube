@@ -274,7 +274,7 @@ function VideoTab() {
                 <Ionicons name="play-back" size={24} color="white" />
               </TouchableOpacity>
               <TouchableOpacity onPress={isPlaying ? pauseVideo : () => playVideo(selectedVideo)} style={styles.controlButton}>
-                <Ionicons name={isPlaying ? "pause" : "play"} size={28} color="white" />
+                <Ionicons name={isPlaying ? "pause" : "play"} size={24} color="white" />
               </TouchableOpacity>
               <TouchableOpacity onPress={seekForward} style={styles.controlButton}>
                 <Ionicons name="play-forward" size={24} color="white" />
@@ -545,6 +545,7 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     width: '90%',
+    height: 194.5,
     marginBottom: 20,
     borderRadius: 10,
     overflow: 'hidden',
@@ -552,18 +553,16 @@ const styles = StyleSheet.create({
   },
   video: {
     width: '100%',
-    height: 200,
-  },
-  videoControlsContainer: {
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    padding: 15,
+    height: '100%',
   },
   videoControls: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 10,
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    gap: 15,
-    marginVertical: 10,
+    gap: 20,
   },
   progressContainer: {
     flexDirection: 'row',
