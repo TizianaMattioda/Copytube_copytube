@@ -1,6 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Button } from 'react-native';
-import CustomSlider from './CustomSlider';
 import { NavigationContainer, useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -151,8 +150,6 @@ function VideoTab() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1.0);
-  const [isSeeking, setIsSeeking] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -242,20 +239,6 @@ function VideoTab() {
     }
   };
 
-  const onSliderValueChange = async (value) => {
-    if (videoRef && !isSeeking) {
-      setIsSeeking(true);
-    }
-    setPosition(value);
-  };
-
-  const onSliderSlidingComplete = async (value) => {
-    if (videoRef) {
-      await videoRef.setPositionAsync(value);
-      setIsSeeking(false);
-    }
-  };
-
   const formatTime = (millis) => {
     const totalSeconds = Math.floor(millis / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -275,39 +258,20 @@ function VideoTab() {
             source={{ uri: selectedVideo.uri }}
             useNativeControls={false}
             resizeMode={ResizeMode.CONTAIN}
-            volume={volume}
             onPlaybackStatusUpdate={(status) => {
               if (status.isLoaded) {
                 setIsPlaying(status.isPlaying);
-                if (!isSeeking) {
-                  setPosition(status.positionMillis);
-                }
                 setDuration(status.durationMillis || 0);
               }
             }}
           />
           <View style={styles.videoControlsContainer}>
-            <View style={styles.progressContainer}>
-              <Text style={styles.timeText}>{formatTime(position)}</Text>
-              <CustomSlider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={duration}
-                value={position}
-                onValueChange={onSliderValueChange}
-                onSlidingComplete={onSliderSlidingComplete}
-                minimumTrackTintColor="#007AFF"
-                maximumTrackTintColor="#d3d3d3"
-                thumbTintColor="#007AFF"
-              />
-              <Text style={styles.timeText}>{formatTime(duration)}</Text>
-            </View>
             <View style={styles.videoControls}>
-              <TouchableOpacity onPress={seekBackward} style={styles.controlButton}>
-                <Ionicons name="play-back" size={24} color="white" />
-              </TouchableOpacity>
               <TouchableOpacity onPress={stopVideo} style={styles.controlButton}>
                 <Ionicons name="stop" size={24} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={seekBackward} style={styles.controlButton}>
+                <Ionicons name="play-back" size={24} color="white" />
               </TouchableOpacity>
               <TouchableOpacity onPress={isPlaying ? pauseVideo : () => playVideo(selectedVideo)} style={styles.controlButton}>
                 <Ionicons name={isPlaying ? "pause" : "play"} size={28} color="white" />
@@ -318,20 +282,6 @@ function VideoTab() {
               <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
                 <Ionicons name="expand" size={24} color="white" />
               </TouchableOpacity>
-            </View>
-            <View style={styles.volumeContainer}>
-              <Ionicons name="volume-low" size={20} color="white" />
-              <CustomSlider
-                style={styles.volumeSlider}
-                minimumValue={0}
-                maximumValue={1}
-                value={volume}
-                onValueChange={setVolume}
-                minimumTrackTintColor="#007AFF"
-                maximumTrackTintColor="#d3d3d3"
-                thumbTintColor="#007AFF"
-              />
-              <Ionicons name="volume-high" size={20} color="white" />
             </View>
           </View>
         </View>
@@ -367,8 +317,6 @@ function AudioTab() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1.0);
-  const [isSeeking, setIsSeeking] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -418,7 +366,7 @@ function AudioTab() {
       
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audio.uri },
-        { shouldPlay: true, volume: volume }
+        { shouldPlay: true }
       );
       
       setSound(newSound);
@@ -430,9 +378,6 @@ function AudioTab() {
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded) {
           setIsPlaying(status.isPlaying);
-          if (!isSeeking) {
-            setPosition(status.positionMillis);
-          }
           setDuration(status.durationMillis || 0);
         }
       });
@@ -480,27 +425,6 @@ function AudioTab() {
     }
   };
 
-  const onSliderValueChange = async (value) => {
-    if (sound && !isSeeking) {
-      setIsSeeking(true);
-    }
-    setPosition(value);
-  };
-
-  const onSliderSlidingComplete = async (value) => {
-    if (sound) {
-      await sound.setPositionAsync(value);
-      setIsSeeking(false);
-    }
-  };
-
-  const onVolumeChange = async (value) => {
-    setVolume(value);
-    if (sound) {
-      await sound.setVolumeAsync(value);
-    }
-  };
-
   const formatTime = (millis) => {
     const totalSeconds = Math.floor(millis / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -515,51 +439,22 @@ function AudioTab() {
       {selectedSound && (
         <View style={styles.audioContainer}>
           <Text style={styles.audioTitle}>{selectedSound.filename}</Text>
-          <View style={styles.progressContainer}>
-            <Text style={styles.timeText}>{formatTime(position)}</Text>
-            <CustomSlider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={duration}
-              value={position}
-              onValueChange={onSliderValueChange}
-              onSlidingComplete={onSliderSlidingComplete}
-              minimumTrackTintColor="#007AFF"
-              maximumTrackTintColor="#d3d3d3"
-              thumbTintColor="#007AFF"
-            />
-            <Text style={styles.timeText}>{formatTime(duration)}</Text>
-          </View>
           <View style={styles.audioControls}>
-            <TouchableOpacity onPress={seekBackward} style={styles.audioControlButton}>
-              <Ionicons name="play-back" size={24} color="white" />
-            </TouchableOpacity>
             <TouchableOpacity onPress={stopSound} style={styles.audioControlButton}>
               <Ionicons name="stop" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={seekBackward} style={styles.audioControlButton}>
+              <Ionicons name="play-back" size={24} color="white" />
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={isPlaying ? pauseSound : resumeSound} 
               style={styles.audioControlButton}
             >
-              <Ionicons name={isPlaying ? "pause" : "play"} size={28} color="white" />
+              <Ionicons name={isPlaying ? "pause" : "play"} size={24} color="white" />
             </TouchableOpacity>
             <TouchableOpacity onPress={seekForward} style={styles.audioControlButton}>
               <Ionicons name="play-forward" size={24} color="white" />
             </TouchableOpacity>
-          </View>
-          <View style={styles.volumeContainer}>
-            <Ionicons name="volume-low" size={20} color="#007AFF" />
-            <CustomSlider
-              style={styles.volumeSlider}
-              minimumValue={0}
-              maximumValue={1}
-              value={volume}
-              onValueChange={onVolumeChange}
-              minimumTrackTintColor="#007AFF"
-              maximumTrackTintColor="#d3d3d3"
-              thumbTintColor="#007AFF"
-            />
-            <Ionicons name="volume-high" size={20} color="#007AFF" />
           </View>
         </View>
       )}
@@ -585,9 +480,6 @@ function AudioTab() {
     </View>
   );
 }
-
-const StackPage1 = createNativeStackNavigator()
-const StackPage2 = createNativeStackNavigator()
 
 const Tab = createBottomTabNavigator();
 function TabNavigator() {
@@ -679,26 +571,11 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 10,
   },
-  slider: {
-    flex: 1,
-    marginHorizontal: 10,
-  },
   timeText: {
     color: 'white',
     fontSize: 12,
     minWidth: 45,
     textAlign: 'center',
-  },
-  volumeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-    paddingHorizontal: 20,
-  },
-  volumeSlider: {
-    flex: 1,
-    marginHorizontal: 10,
   },
   controlButton: {
     backgroundColor: 'rgba(0,0,0,0.7)',
