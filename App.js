@@ -2,8 +2,8 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Button } from 'react-native';
 import { NavigationContainer, useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Video, ResizeMode } from 'expo-av';
 import { Audio } from 'expo-av';
 import React, { useState, useEffect } from 'react';
@@ -92,8 +92,6 @@ function DownloadsTab() {
           to: finalPath
         });
         
-        console.log('Archivo guardado en:', finalPath);
-        
         // Obtener información del archivo desde su ubicación final
         const fileInfo = await FileSystem.getInfoAsync(finalPath);
         const sizeInMB = Math.round(fileInfo.size / 1024 / 1024 * 100) / 100;
@@ -102,14 +100,16 @@ function DownloadsTab() {
         
         Alert.alert(
           'Éxito', 
-          `${fileType} descargado exitosamente:\n${fileName}\nTamaño: ${sizeInMB} MB\n\nGuardado en:\n${storageLocation}`
+          `${fileType} descargado exitosamente:\n${fileName}\nTamaño: ${sizeInMB} MB`
         );
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
         
         // Limpiar archivo temporal
         await FileSystem.deleteAsync(tempFilePath, { idempotent: true });
         
       } else {
         Alert.alert('Error', 'No se pudo descargar el archivo');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
       }
       
     } catch (error) {
@@ -134,6 +134,9 @@ function DownloadsTab() {
       <TouchableOpacity style={styles.downloadButton} onPress={download}>
         <Ionicons name="download" size={20} color="white" style={styles.buttonIcon} />
         <Text style={styles.buttonText}>Descargar</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)}> {/*Eliminar código extra con Cursor*/}
+        <Text>bitch</Text>
       </TouchableOpacity>
       <Text style={styles.note}>Si no ingresas una URL, se descargará un video de ejemplo.</Text>
       <Text style={styles.note}>Los archivos se guardan en el almacenamiento interno de la app.</Text>
