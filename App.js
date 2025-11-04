@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Button } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Button, Vibration } from 'react-native';
 import { NavigationContainer, useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -103,6 +103,7 @@ function DownloadsTab() {
           `${fileType} descargado exitosamente:\n${fileName}\nTamaño: ${sizeInMB} MB`
         );
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+        Vibration.vibrate(500);
         
         // Limpiar archivo temporal
         await FileSystem.deleteAsync(tempFilePath, { idempotent: true });
@@ -110,6 +111,7 @@ function DownloadsTab() {
       } else {
         Alert.alert('Error', 'No se pudo descargar el archivo');
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+        Vibration.vibrate(300);
       }
       
     } catch (error) {
@@ -135,9 +137,7 @@ function DownloadsTab() {
         <Ionicons name="download" size={20} color="white" style={styles.buttonIcon} />
         <Text style={styles.buttonText}>Descargar</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)}> {/*Eliminar código extra con Cursor*/}
-        <Text>bitch</Text>
-      </TouchableOpacity>
+      
       <Text style={styles.note}>Si no ingresas una URL, se descargará un video de ejemplo.</Text>
       <Text style={styles.note}>Los archivos se guardan en el almacenamiento interno de la app.</Text>
       <StatusBar style="auto" />
