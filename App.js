@@ -1,12 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Button, Vibration } from 'react-native';
-import { NavigationContainer, useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Vibration } from 'react-native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Video, ResizeMode } from 'expo-av';
 import { Audio } from 'expo-av';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
 
 function DownloadsTab() {
@@ -242,12 +242,7 @@ function VideoTab() {
     }
   };
 
-  const formatTime = (millis) => {
-    const totalSeconds = Math.floor(millis / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  
 
   return (
     <View style={styles.container}>
@@ -428,12 +423,7 @@ function AudioTab() {
     }
   };
 
-  const formatTime = (millis) => {
-    const totalSeconds = Math.floor(millis / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  
 
   return (
     <View style={styles.container}>
@@ -534,12 +524,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
-  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -566,18 +550,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 20,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 10,
-  },
-  timeText: {
-    color: 'white',
-    fontSize: 12,
-    minWidth: 45,
-    textAlign: 'center',
   },
   controlButton: {
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -656,15 +628,6 @@ const styles = StyleSheet.create({
   },
   downloadButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 15,
-  },
-  permissionButton: {
-    backgroundColor: '#34C759',
     paddingHorizontal: 30,
     paddingVertical: 15,
     borderRadius: 25,
